@@ -1,0 +1,380 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "JANSEVA Civic Issue Platform API",
+    "description": "Complete OpenAPI specification for JANSEVA civic platform: Phone+Password JWT auth, public citizen registration, admin officer creation & management, admin complaint assignment, officer workflows (start, resolve with AFTER photos), GeoJSON 2dsphere spatial queries, SLA deadlines (+4h), and citizen resolution verification.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Provide JWT token received after login or registration"
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "summary": "Public Citizen Registration",
+        "description": "Registers a new CITIZEN account with name, Indian phone number, optional email, and password. Strictly enforces role='CITIZEN'.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "Rahul Kumar" },
+                  "phone": { "type": "string", "example": "9876543210" },
+                  "email": { "type": "string", "example": "rahul@example.com" },
+                  "password": { "type": "string", "example": "Secure@123" }
+                },
+                "required": ["name", "phone", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Citizen registered successfully, returns token and user" },
+          "400": { "description": "Validation error or weak password" },
+          "409": { "description": "Phone or email already in use" }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "User Login (Citizen, Officer, Admin)",
+        "description": "Authenticates user using phone and password. Returns JWT token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": { "type": "string", "example": "9876543210" },
+                  "password": { "type": "string", "example": "Secure@123" }
+                },
+                "required": ["phone", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful, returns token and user" },
+          "401": { "description": "Invalid phone number or password" },
+          "403": { "description": "User account is deactivated" }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "summary": "Get Current Authenticated User Profile",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "User profile returned without password" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "summary": "Logout User",
+        "responses": {
+          "200": { "description": "Logged out successfully" }
+        }
+      }
+    },
+    "/api/v1/admin/officers": {
+      "post": {
+        "summary": "Create Officer Account (ADMIN Only)",
+        "security": [{ "BearerAuth": [] }],
+        "description": "Creates an OFFICER user account. Only accessible by ADMIN.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "Raj Kumar" },
+                  "phone": { "type": "string", "example": "9876543211" },
+                  "email": { "type": "string", "example": "raj@janseva.in" },
+                  "password": { "type": "string", "example": "Temporary@123" }
+                },
+                "required": ["name", "phone", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Officer created successfully" },
+          "403": { "description": "Forbidden: ADMIN only" },
+          "409": { "description": "Phone or email already in use" }
+        }
+      },
+      "get": {
+        "summary": "List Officer Accounts (ADMIN Only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Search by name, phone, email" },
+          { "name": "isActive", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "List of officers" }
+        }
+      }
+    },
+    "/api/v1/admin/officers/{officerId}": {
+      "patch": {
+        "summary": "Update Officer Account (ADMIN Only)",
+        "security": [{ "BearerAuth": [] }],
+        "description": "Updates officer details (name, email, phone, isActive). Role cannot be modified.",
+        "parameters": [
+          { "name": "officerId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "isActive": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Officer updated successfully" }
+        }
+      }
+    },
+    "/api/v1/admin/complaints/{complaintId}/assign": {
+      "patch": {
+        "summary": "Assign Officer to Complaint (ADMIN Only)",
+        "security": [{ "BearerAuth": [] }],
+        "description": "Assigns an active OFFICER to a SUBMITTED or REOPENED complaint. Sets status to ASSIGNED.",
+        "parameters": [
+          { "name": "complaintId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "officerId": { "type": "string", "example": "650c1f1f..." }
+                },
+                "required": ["officerId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Complaint assigned successfully" }
+        }
+      }
+    },
+    "/api/v1/complaints": {
+      "post": {
+        "summary": "Create Urban Issue Complaint (Citizen)",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "category": { "type": "string", "enum": ["GARBAGE", "POTHOLE", "STREET_LIGHT", "WATER_LEAK", "DRAINAGE", "ROAD_DAMAGE", "OTHER"] },
+                  "description": { "type": "string" },
+                  "latitude": { "type": "number", "example": 22.3072 },
+                  "longitude": { "type": "number", "example": 73.1812 },
+                  "address": { "type": "string" },
+                  "ward": { "type": "string" },
+                  "city": { "type": "string" },
+                  "state": { "type": "string" },
+                  "photos": {
+                    "type": "array",
+                    "items": { "type": "string", "format": "binary" }
+                  }
+                },
+                "required": ["category", "latitude", "longitude", "photos"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Complaint reported successfully" }
+        }
+      }
+    },
+    "/api/v1/complaints/my": {
+      "get": {
+        "summary": "Get My Reported Complaints (Citizen)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "List of citizen complaints" }
+        }
+      }
+    },
+    "/api/v1/complaints/nearby": {
+      "get": {
+        "summary": "Geospatial 2dsphere Nearby Complaints Search",
+        "parameters": [
+          { "name": "latitude", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "longitude", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "radius", "in": "query", "schema": { "type": "number", "default": 300 } }
+        ],
+        "responses": {
+          "200": { "description": "Active nearby complaints" }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaintId}": {
+      "get": {
+        "summary": "Get Complaint Details by ID or Number",
+        "parameters": [
+          { "name": "complaintId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Complaint details" }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaintId}/history": {
+      "get": {
+        "summary": "Get Complaint History Timeline",
+        "parameters": [
+          { "name": "complaintId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "History timeline entries" }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaintId}/support": {
+      "post": {
+        "summary": "Support Complaint (Citizen)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "complaintId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Complaint supported, new priority returned" }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaintId}/verification": {
+      "post": {
+        "summary": "Citizen Verification of Resolution",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "complaintId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fixed": { "type": "boolean" },
+                  "comment": { "type": "string" }
+                },
+                "required": ["fixed"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Verification recorded" }
+        }
+      }
+    },
+    "/api/v1/officer/complaints": {
+      "get": {
+        "summary": "Get Officer Assigned Complaints List",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Assigned complaints list" }
+        }
+      }
+    },
+    "/api/v1/officer/complaints/{complaintId}": {
+      "get": {
+        "summary": "Get Complaint Details for Officer",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "complaintId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Complaint detail" }
+        }
+      }
+    },
+    "/api/v1/officer/complaints/{complaintId}/start": {
+      "patch": {
+        "summary": "Start Work on Assigned Complaint (Assigned Officer Only)",
+        "security": [{ "BearerAuth": [] }],
+        "description": "Transitions complaint status from ASSIGNED (or REOPENED) to IN_PROGRESS. Only allowed for assigned officer.",
+        "parameters": [
+          { "name": "complaintId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Work started. Status set to IN_PROGRESS" },
+          "403": { "description": "Forbidden: Not the assigned officer" }
+        }
+      }
+    },
+    "/api/v1/officer/complaints/{complaintId}/resolve": {
+      "patch": {
+        "summary": "Resolve Complaint & Upload AFTER Photos (Assigned Officer Only)",
+        "security": [{ "BearerAuth": [] }],
+        "description": "Transitions status from IN_PROGRESS to RESOLVED_PENDING_VERIFICATION and uploads AFTER proof photos to Cloudinary.",
+        "parameters": [
+          { "name": "complaintId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": { "type": "string" },
+                  "photos": {
+                    "type": "array",
+                    "items": { "type": "string", "format": "binary" },
+                    "description": "AFTER proof photos"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Complaint resolved, pending citizen verification" },
+          "403": { "description": "Forbidden: Not the assigned officer" }
+        }
+      }
+    }
+  }
+}

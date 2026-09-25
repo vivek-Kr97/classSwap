@@ -1,0 +1,325 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "ClassSwap API",
+    "version": "1.0.0",
+    "description": "Complete REST API Documentation for ClassSwap — University Slot Swapping Platform.\nSupports Student Swap Requests, Rule Engine Checks, Mutual Acceptance, Faculty Approvals, Atomic Timetable Exchanges, Audit Logging, and System Administration."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4000/api",
+      "description": "Local Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Enter JWT Bearer token obtained from POST /api/auth/login"
+      }
+    },
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "data": { "type": "object" },
+          "code": { "type": "string" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string", "example": "Validation failed" },
+          "code": { "type": "string", "example": "VALIDATION_ERROR" },
+          "errors": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "LoginPayload": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "example": "ravi.k@univ.edu" },
+          "password": { "type": "string", "example": "Password123!" }
+        }
+      },
+      "RegisterStudentPayload": {
+        "type": "object",
+        "required": ["fullName", "email", "enrollmentNumber", "password", "programId", "semesterId"],
+        "properties": {
+          "fullName": { "type": "string", "example": "Ravi Kumar" },
+          "email": { "type": "string", "example": "ravi.k@univ.edu" },
+          "enrollmentNumber": { "type": "string", "example": "STU001" },
+          "password": { "type": "string", "example": "Password123!" },
+          "programId": { "type": "string" },
+          "semesterId": { "type": "string" },
+          "batch": { "type": "string", "example": "Batch A" }
+        }
+      },
+      "CheckSwapPayload": {
+        "type": "object",
+        "required": ["currentSlotId", "desiredSlotId"],
+        "properties": {
+          "currentSlotId": { "type": "string" },
+          "desiredSlotId": { "type": "string" }
+        }
+      },
+      "CreateSwapPayload": {
+        "type": "object",
+        "required": ["currentSlotId", "desiredSlotId", "reason"],
+        "properties": {
+          "currentSlotId": { "type": "string" },
+          "desiredSlotId": { "type": "string" },
+          "reason": { "type": "string", "example": "Family event on Mondays" }
+        }
+      },
+      "FacultyDecisionPayload": {
+        "type": "object",
+        "properties": {
+          "comment": { "type": "string", "example": "Approved for schedule alignment." }
+        }
+      }
+    }
+  },
+  "tags": [
+    { "name": "Health", "description": "API Health Check" },
+    { "name": "Auth", "description": "Authentication & Session management" },
+    { "name": "Academic", "description": "Departments, Programs, Semesters, Courses, Slots" },
+    { "name": "Student", "description": "Student Timetable and Profile" },
+    { "name": "Swaps", "description": "Swap Rule Engine, Creation, Open Board, Acceptance" },
+    { "name": "Faculty", "description": "Faculty Pending Swaps, Approvals and Rejections" },
+    { "name": "Admin", "description": "Admin Stats, Audit Logs, Rules, Conflict Checker" },
+    { "name": "Notifications", "description": "User In-App Notifications" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health Check",
+        "responses": {
+          "200": { "description": "API is running normally" }
+        }
+      }
+    },
+    "/auth/register/student": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new student account",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterStudentPayload" } } }
+        },
+        "responses": {
+          "201": { "description": "Student registered successfully" },
+          "409": { "description": "Email or enrollment number already registered" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Log in as Student, Faculty, or Admin",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginPayload" } } }
+        },
+        "responses": {
+          "200": { "description": "Login successful, returns JWT Access Token" },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get authenticated user profile",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "User details returned" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Refresh Access Token",
+        "responses": {
+          "200": { "description": "New access token generated" }
+        }
+      }
+    },
+    "/departments": {
+      "get": {
+        "tags": ["Academic"],
+        "summary": "Get active departments",
+        "responses": { "200": { "description": "List of departments" } }
+      }
+    },
+    "/programs": {
+      "get": {
+        "tags": ["Academic"],
+        "summary": "Get programs",
+        "responses": { "200": { "description": "List of programs" } }
+      }
+    },
+    "/semesters": {
+      "get": {
+        "tags": ["Academic"],
+        "summary": "Get semesters",
+        "responses": { "200": { "description": "List of semesters" } }
+      }
+    },
+    "/courses": {
+      "get": {
+        "tags": ["Academic"],
+        "summary": "Get courses",
+        "responses": { "200": { "description": "List of active courses" } }
+      }
+    },
+    "/slots": {
+      "get": {
+        "tags": ["Academic"],
+        "summary": "Get class/lab slots",
+        "responses": { "200": { "description": "List of class and lab slots" } }
+      }
+    },
+    "/students/me/timetable": {
+      "get": {
+        "tags": ["Student"],
+        "summary": "Get student's real timetable from MongoDB",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Structured timetable with enrolled slots" }
+        }
+      }
+    },
+    "/swaps/check": {
+      "post": {
+        "tags": ["Swaps"],
+        "summary": "Evaluate backend rule checks for target swap slot",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CheckSwapPayload" } } }
+        },
+        "responses": {
+          "200": { "description": "Detailed rule evaluation results" }
+        }
+      }
+    },
+    "/swaps": {
+      "post": {
+        "tags": ["Swaps"],
+        "summary": "Create an OPEN swap request",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateSwapPayload" } } }
+        },
+        "responses": {
+          "201": { "description": "Swap request created in OPEN status" }
+        }
+      }
+    },
+    "/swaps/open": {
+      "get": {
+        "tags": ["Swaps"],
+        "summary": "Get open swap opportunities on the board",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "List of open swap requests from other students" }
+        }
+      }
+    },
+    "/swaps/me": {
+      "get": {
+        "tags": ["Swaps"],
+        "summary": "Get user's created or accepted swap requests",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "List of student swap requests" } }
+      }
+    },
+    "/swaps/{id}/accept": {
+      "post": {
+        "tags": ["Swaps"],
+        "summary": "Accept an open swap request",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Swap matched and set to PENDING_APPROVAL" }
+        }
+      }
+    },
+    "/swaps/{id}/cancel": {
+      "post": {
+        "tags": ["Swaps"],
+        "summary": "Cancel an open swap request",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Swap cancelled" } }
+      }
+    },
+    "/faculty/swaps/pending": {
+      "get": {
+        "tags": ["Faculty"],
+        "summary": "Get pending swap requests for faculty assigned courses",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "List of pending approval requests" } }
+      }
+    },
+    "/faculty/swaps/{id}/approve": {
+      "post": {
+        "tags": ["Faculty"],
+        "summary": "Approve swap request & execute atomic timetable exchange",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FacultyDecisionPayload" } } }
+        },
+        "responses": {
+          "200": { "description": "Swap approved and timetables updated via MongoDB Transaction" }
+        }
+      }
+    },
+    "/faculty/swaps/{id}/reject": {
+      "post": {
+        "tags": ["Faculty"],
+        "summary": "Reject swap request",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FacultyDecisionPayload" } } }
+        },
+        "responses": { "200": { "description": "Swap rejected" } }
+      }
+    },
+    "/admin/dashboard": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get system statistics dashboard",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Dashboard statistics" } }
+      }
+    },
+    "/admin/audit-logs": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get system audit logs",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Paginated system audit logs" } }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "Get user notifications",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "List of user notifications" } }
+      }
+    }
+  }
+}
