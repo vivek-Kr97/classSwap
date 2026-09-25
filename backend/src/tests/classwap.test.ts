@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import request from "supertest";
-import app from "./../app";
+import app from "./../server";
 import { seedDatabase } from "./../seeds/seed";
 
 describe("ClassSwap Backend End-to-End API Test Suite", () => {
